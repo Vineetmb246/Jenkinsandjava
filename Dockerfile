@@ -1,23 +1,17 @@
-# ---------- Stage 1: Build ----------
-FROM maven:3.8.1-jdk-8-slim AS build
+# Use a newer Maven image for better TLS stability
+FROM maven:3.9.9-eclipse-temurin-17 AS build
 WORKDIR /app
 
-# Copy only pom.xml first to cache dependencies
+# Preload dependencies (cached layer)
 COPY pom.xml .
-RUN mvn dependency:go-offline -B
+RUN mvn -B dependency:go-offline -DskipTests
 
-# Now copy source code and build the WAR (skip tests for speed)
+# Copy source and build
 COPY src ./src
-RUN mvn clean package -DskipTests
+RUN mvn -B clean package -DskipTests
 
-# ---------- Stage 2: Runtime ----------
-FROM tomcat:9.0.53-jdk8
-# Copy the built WAR into Tomcat webapps directory
+# Use Tomcat to deploy WAR
+FROM tomcat:9.0.85-jdk17
 COPY --from=build /app/target/helloworld-1.0-SNAPSHOT.war /usr/local/tomcat/webapps/helloworld.war
-
-# Optional: expose the default Tomcat port
 EXPOSE 8080
-
-# Start Tomcat
 CMD ["catalina.sh", "run"]
-
